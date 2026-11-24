@@ -138,12 +138,44 @@
 </div>`;
 
     try {
-      const res = await fetch('api/bracket.php');
-      const json = await res.json();
+      let matches = [];
 
-      if (!res.ok || !json.success) throw new Error(json.error || 'Gagal memuat data bracket');
+      // Gunakan Supabase Client
+      if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        const { data, error } = await sb
+          .from('tournament_matches')
+          .select('*')
+          .order('round_order', { ascending: true })
+          .order('match_number', { ascending: true });
 
-      const rounds = json.data || [];
+        if (error) throw error;
+        matches = data || [];
+      } else {
+        // Fallback jika API PHP lokal masih ada
+        const res = await fetch('api/bracket.php');
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error || 'Gagal memuat data bracket');
+        const rList = json.data || [];
+        matches = rList.flatMap(r => r.matches || []);
+      }
+
+      // Kelompokkan pertandingan per ronde / babak
+      const roundMap = {};
+      matches.forEach(m => {
+        const rName = m.round_name || 'Babak Knockout';
+        if (!roundMap[rName]) {
+          roundMap[rName] = {
+            round_name: rName,
+            round_order: Number(m.round_order || 1),
+            matches: []
+          };
+        }
+        roundMap[rName].matches.push(m);
+      });
+
+      const rounds = Object.values(roundMap).sort((a, b) => a.round_order - b.round_order);
+
       if (rounds.length === 0) {
         container.innerHTML = emptyState();
         return;

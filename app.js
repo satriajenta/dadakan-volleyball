@@ -5,6 +5,16 @@
 
 const $ = (s) => document.querySelector(s);
 let registrations = [];
+let sb = null;
+
+const getSupabase = () => {
+  if (sb) return sb;
+  if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+    sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    return sb;
+  }
+  return null;
+};
 
 // Toast notification helper
 const toast = (message) => {
@@ -85,6 +95,11 @@ function validatePlayers(players) {
 
 // Inisialisasi Aplikasi
 async function init() {
+  // Tampilkan instruksi pembayaran jika dikonfigurasi di config.js
+  if (window.PAYMENT_INSTRUCTIONS && $('#paymentInstructions')) {
+    $('#paymentInstructions').textContent = window.PAYMENT_INSTRUCTIONS;
+  }
+
   // Tambah default 6 pemain awal
   const list = $('#playersList');
   if (list && list.children.length === 0) {
@@ -128,7 +143,7 @@ async function init() {
   checkAdminSession();
 }
 
-// Submit Pendaftaran ke MySQL API
+// Submit Pendaftaran (Mendukung Supabase & MySQL)
 async function submitRegistration(e) {
   e.preventDefault();
   const form = e.currentTarget;
@@ -149,23 +164,54 @@ async function submitRegistration(e) {
     const phone = String(fd.get('whatsapp') || '').replace(/\D/g, '');
     if (phone.length < 9 || phone.length > 16) throw new Error('Nomor WhatsApp tidak valid.');
 
-    fd.set('whatsapp', phone);
-    fd.set('players', JSON.stringify(players));
-    if (file) {
-      fd.set('payment_proof', file);
-    }
-
     btn.disabled = true;
-    btn.innerHTML = 'MENGIRIM DATA KE MYSQL…';
+    btn.innerHTML = 'MENGIRIM DATA…';
 
-    const res = await fetch('api/register.php', {
-      method: 'POST',
-      body: fd
-    });
+    let registeredCode = '';
+    const client = getSupabase();
 
-    const result = await res.json();
-    if (!res.ok || !result.success) {
-      throw new Error(result.error || 'Pendaftaran gagal. Pastikan MySQL di XAMPP aktif.');
+    if (client) {
+      // Alur Cloud / Supabase
+      const code = 'DV-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `pending/${code}/${Date.now()}-${safeName}`;
+
+      const upload = await client.storage.from('registration-proofs').upload(storagePath, file, {
+        contentType: file.type,
+        upsert: false
+      });
+      if (upload.error) throw upload.error;
+
+      const payload = {
+        p_code: code,
+        p_team_name: fd.get('team_name').trim(),
+        p_origin: (fd.get('origin') || '').trim(),
+        p_captain_name: fd.get('captain_name').trim(),
+        p_whatsapp: phone,
+        p_email: (fd.get('email') || '').trim(),
+        p_manager_name: (fd.get('manager_name') || '').trim(),
+        p_payment_method: fd.get('payment_method'),
+        p_payer_name: fd.get('payer_name').trim(),
+        p_proof_path: storagePath,
+        p_players: players
+      };
+
+      const result = await client.rpc('create_team_registration', payload);
+      if (result.error) {
+        await client.storage.from('registration-proofs').remove([storagePath]);
+        throw result.error;
+      }
+      registeredCode = code;
+    } else {
+      // Fallback ke PHP API jika ada
+      fd.set('whatsapp', phone);
+      fd.set('players', JSON.stringify(players));
+      if (file) fd.set('payment_proof', file);
+
+      const res = await fetch('api/register.php', { method: 'POST', body: fd });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Pendaftaran gagal.');
+      registeredCode = result.code;
     }
 
     // Tampilkan box sukses
@@ -174,16 +220,16 @@ async function submitRegistration(e) {
     if (successBox) {
       successBox.classList.remove('hidden');
       successBox.innerHTML = `
-        <h3>Pendaftaran berhasil disimpan ke Database!</h3>
+        <h3>Pendaftaran berhasil dikirim!</h3>
         <p>Catat kode registrasi tim kamu:</p>
-        <div class="code-display">${escapeHtml(result.code)}</div>
+        <div class="code-display">${escapeHtml(registeredCode)}</div>
         <p>Gunakan kode tersebut dan 4 digit terakhir WhatsApp kapten pada formulir <b>Cek status tim</b>.</p>
         <button type="button" class="btn btn-outline" id="copyCode">Salin kode registrasi</button>
       `;
       $('#copyCode')?.addEventListener('click', () => {
-        navigator.clipboard.writeText(result.code)
+        navigator.clipboard.writeText(registeredCode)
           .then(() => toast('Kode registrasi disalin'))
-          .catch(() => toast('Kode: ' + result.code));
+          .catch(() => toast('Kode: ' + registeredCode));
       });
       successBox.scrollIntoView({ behavior: 'smooth' });
     }
@@ -199,28 +245,36 @@ async function submitRegistration(e) {
   }
 }
 
-// Cek Status Pendaftaran dari MySQL API
+// Cek Status Pendaftaran
 async function checkStatus(e) {
   e.preventDefault();
   const form = e.currentTarget;
   const fd = new FormData(form);
   const box = $('#statusResult');
-  const code = String(fd.get('code') || '').trim();
+  const code = String(fd.get('code') || '').trim().toUpperCase();
   const phoneLast4 = String(fd.get('phone_last4') || '').trim();
 
   try {
-    const res = await fetch(`api/check-status.php?code=${encodeURIComponent(code)}&phone_last4=${encodeURIComponent(phoneLast4)}`);
-    const json = await res.json();
+    const client = getSupabase();
+    let d = null;
+
+    if (client) {
+      const { data, error } = await client.rpc('check_registration_status', {
+        p_code: code,
+        p_phone_last4: phoneLast4
+      });
+      if (error || !data) throw new Error('Data tidak ditemukan. Periksa kode registrasi dan 4 digit nomor WhatsApp.');
+      d = data;
+    } else {
+      const res = await fetch(`api/check-status.php?code=${encodeURIComponent(code)}&phone_last4=${encodeURIComponent(phoneLast4)}`);
+      const json = await res.json();
+      if (!res.ok || !json.success || !json.data) throw new Error(json.error || 'Data tidak ditemukan.');
+      d = json.data;
+    }
 
     if (!box) return;
     box.classList.remove('hidden');
 
-    if (!res.ok || !json.success || !json.data) {
-      box.innerHTML = `<span style="color:#b91c1c;">${escapeHtml(json.error || 'Data tidak ditemukan. Periksa kode dan 4 digit WhatsApp.')}</span>`;
-      return;
-    }
-
-    const d = json.data;
     const statusLabels = {
       pending: '⏳ Menunggu verifikasi',
       approved: '✅ Diterima (Lolos)',
@@ -230,8 +284,6 @@ async function checkStatus(e) {
     box.innerHTML = `
       <b>${escapeHtml(d.team_name)}</b> ${d.origin ? `<small>(${escapeHtml(d.origin)})</small>` : ''}<br>
       Kode: <strong>${escapeHtml(d.code)}</strong><br>
-      Kapten: ${escapeHtml(d.captain_name)}<br>
-      Pemain: <b>${d.player_count} orang</b><br>
       Status: <strong>${statusLabels[d.status] || d.status}</strong><br>
       Pembayaran: ${d.payment_verified ? '<span style="color:#15803d;font-weight:700;">Terverifikasi</span>' : 'Menunggu pemeriksaan'}<br>
       ${d.admin_note ? `<div style="margin-top:6px;padding:8px;background:#fef2f2;border-radius:6px;color:#991b1b;"><b>Catatan Panitia:</b><br>${escapeHtml(d.admin_note)}</div>` : ''}
@@ -239,7 +291,7 @@ async function checkStatus(e) {
   } catch (err) {
     if (box) {
       box.classList.remove('hidden');
-      box.innerHTML = `<span style="color:#b91c1c;">Gagal menghubungi server MySQL: ${escapeHtml(err.message)}</span>`;
+      box.innerHTML = `<span style="color:#b91c1c;">${escapeHtml(err.message)}</span>`;
     }
   }
 }

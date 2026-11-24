@@ -14,6 +14,16 @@
   let currentFilter = 'all';
   let searchQuery = '';
   let isDemoMode = false;
+  let sbClient = null;
+
+  function getSupabase() {
+    if (sbClient) return sbClient;
+    if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+      sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      return sbClient;
+    }
+    return null;
+  }
 
   // Data Demo Cadangan (bila MySQL di XAMPP belum dijalankan)
   const DEFAULT_DEMO_DATA = [
@@ -229,6 +239,26 @@
   async function checkDatabaseConnection() {
     const dot = $('#connectionDot');
     const text = $('#connectionText');
+    const sb = getSupabase();
+
+    if (sb) {
+      if (dot && text) {
+        dot.className = 'status-dot online';
+        text.textContent = 'Supabase Cloud';
+      }
+      const { data } = await sb.auth.getSession();
+      if (data && data.session) {
+        currentAdmin = {
+          id: data.session.user.id,
+          email: data.session.user.email,
+          full_name: 'Panitia Turnamen'
+        };
+        showDashboardView();
+        await loadRegistrations();
+        await loadBracketAdmin();
+      }
+      return;
+    }
 
     try {
       const res = await fetch('api/auth.php?action=check');
@@ -249,13 +279,12 @@
     } catch (err) {
       if (dot && text) {
         dot.className = 'status-dot demo';
-        text.textContent = 'MySQL Belum Aktif';
+        text.textContent = 'Offline / Demo';
       }
-      setAlert('Tidak dapat menghubungi server MySQL. Pastikan service MySQL di XAMPP Control Panel sudah dalam status <b>Running (Start)</b>.', 'error');
     }
   }
 
-  // Login Handler (MySQL)
+  // Login Handler (Supabase & MySQL)
   async function handleLogin(e) {
     e.preventDefault();
     const submitBtn = $('#submitLoginBtn');
@@ -269,8 +298,38 @@
 
     try {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span>Memverifikasi MySQL…</span>';
+      submitBtn.innerHTML = '<span>Memverifikasi akun…</span>';
       setAlert('', 'none');
+
+      const sb = getSupabase();
+      if (sb) {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+
+        // Cek apakah terdaftar di admin_users
+        const { data: adminData, error: adminErr } = await sb
+          .from('admin_users')
+          .select('user_id')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+
+        if (adminErr || !adminData) {
+          await sb.auth.signOut();
+          throw new Error('Akun ini belum diotorisasi sebagai panitia (UID belum ada di admin_users).');
+        }
+
+        currentAdmin = {
+          id: data.user.id,
+          email: data.user.email,
+          full_name: 'Panitia Turnamen'
+        };
+        isDemoMode = false;
+        showToast('Login Supabase berhasil!');
+        showDashboardView();
+        await loadRegistrations();
+        await loadBracketAdmin();
+        return;
+      }
 
       const res = await fetch('api/auth.php?action=login', {
         method: 'POST',
@@ -279,7 +338,6 @@
       });
 
       const json = await res.json();
-
       if (!res.ok || !json.success) {
         throw new Error(json.error || 'Email atau password salah.');
       }
@@ -324,6 +382,15 @@
 
   // Logout
   async function handleLogout() {
+    const sb = getSupabase();
+    if (sb) {
+      await sb.auth.signOut();
+      currentAdmin = null;
+      showLoginView();
+      showToast('Berhasil logout');
+      return;
+    }
+
     if (isDemoMode) {
       currentAdmin = null;
       isDemoMode = false;
@@ -370,7 +437,7 @@
     }
   }
 
-  // Load Registrations from MySQL
+  // Load Registrations from Supabase / MySQL
   async function loadRegistrations() {
     if (isDemoMode) {
       renderRegistrations();
@@ -378,6 +445,19 @@
     }
 
     try {
+      const sb = getSupabase();
+      if (sb) {
+        const { data, error } = await sb
+          .from('registrations')
+          .select('*, registration_players(*)')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        registrations = data || [];
+        renderRegistrations();
+        return;
+      }
+
       const res = await fetch('api/admin.php?action=list');
       const json = await res.json();
 
@@ -388,7 +468,7 @@
       registrations = json.data || [];
       renderRegistrations(json.stats);
     } catch (err) {
-      showToast('Gagal memuat data MySQL: ' + err.message);
+      showToast('Gagal memuat data: ' + err.message);
     }
   }
 
@@ -563,7 +643,7 @@
     if ($('#badgeRejected')) $('#badgeRejected').textContent = rejected;
   }
 
-  // Update Status in MySQL Database
+  // Update Status in Supabase / MySQL Database
   async function updateRegistrationStatus(id, newStatus, note = null) {
     if (isDemoMode) {
       const idx = registrations.findIndex((x) => String(x.id) === String(id));
@@ -578,6 +658,24 @@
     }
 
     try {
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb
+          .from('registrations')
+          .update({
+            status: newStatus,
+            payment_verified: newStatus === 'approved',
+            admin_note: note || (newStatus === 'approved' ? 'Terverifikasi panitia' : null),
+            reviewed_at: new Date().toISOString()
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+        showToast('Status pendaftaran berhasil diperbarui.');
+        await loadRegistrations();
+        return;
+      }
+
       const res = await fetch('api/admin.php?action=update_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -591,7 +689,7 @@
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Gagal mengubah status');
 
-      showToast('Status pendaftaran berhasil diperbarui di MySQL.');
+      showToast('Status pendaftaran berhasil diperbarui.');
       await loadRegistrations();
     } catch (err) {
       showToast('Gagal mengubah status: ' + err.message);
@@ -628,7 +726,7 @@
   }
 
   // Show Payment Proof Modal
-  function showProofModal(item) {
+  async function showProofModal(item) {
     const modal = $('#proofModal');
     $('#proofModalTeam').textContent = item.team_name;
     $('#proofModalPayer').textContent = `${item.payment_method} — A.n. ${item.payer_name}`;
@@ -636,8 +734,22 @@
     const previewContainer = $('#proofModalPreview');
     if (!previewContainer) return;
 
-    const filePath = item.proof_path || '';
-    const isPdf = filePath.toLowerCase().endsWith('.pdf');
+    let filePath = item.proof_path || '';
+    const sb = getSupabase();
+
+    // Jika di Supabase Storage
+    if (sb && filePath.startsWith('pending/')) {
+      previewContainer.innerHTML = '<div style="padding:24px;">Membuat tautan bukti aman…</div>';
+      openModal(modal);
+      const { data, error } = await sb.storage.from('registration-proofs').createSignedUrl(filePath, 300);
+      if (error || !data) {
+        previewContainer.innerHTML = '<div style="padding:24px;color:#dc2626;">Gagal membuka bukti pembayaran Supabase Storage.</div>';
+        return;
+      }
+      filePath = data.signedUrl;
+    }
+
+    const isPdf = filePath.toLowerCase().includes('.pdf');
 
     if (isPdf) {
       previewContainer.innerHTML = `
@@ -693,22 +805,27 @@
 
   // Export to CSV
   function exportToCsv() {
-    if (isDemoMode) {
-      showToast('Mode demo: menggunakan export lokal');
-      // Export lokal dari array
-      const headers = ['Kode', 'Tim', 'Asal', 'Kapten', 'WhatsApp', 'Metode', 'Pengirim', 'Status'];
-      const rows = registrations.map((r) => [r.code, `"${r.team_name}"`, `"${r.origin}"`, `"${r.captain_name}"`, r.whatsapp, r.payment_method, `"${r.payer_name}"`, r.status]);
-      const csv = '\uFEFF' + [headers.join(','), ...rows.map(x => x.join(','))].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pendaftaran-demo-${Date.now()}.csv`;
-      a.click();
-      return;
-    }
-
-    // Download file CSV dari server PHP MySQL
-    window.location.href = 'api/admin.php?action=export_csv';
+    showToast('Mengunduh data pendaftaran CSV…');
+    const headers = ['Kode', 'Nama Tim', 'Asal', 'Kapten', 'WhatsApp', 'Email', 'Metode Bayar', 'Pengirim', 'Status', 'Verifikasi Pembayaran', 'Catatan Admin'];
+    const rows = registrations.map((r) => [
+      r.code,
+      `"${(r.team_name || '').replace(/"/g, '""')}"`,
+      `"${(r.origin || '').replace(/"/g, '""')}"`,
+      `"${(r.captain_name || '').replace(/"/g, '""')}"`,
+      r.whatsapp,
+      `"${(r.email || '').replace(/"/g, '""')}"`,
+      r.payment_method,
+      `"${(r.payer_name || '').replace(/"/g, '""')}"`,
+      r.status,
+      r.payment_verified ? 'Lunas' : 'Belum',
+      `"${(r.admin_note || '').replace(/"/g, '""')}"`
+    ]);
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(x => x.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `pendaftaran-turnamen-${Date.now()}.csv`;
+    a.click();
   }
 
   // ==============================================================
@@ -747,9 +864,29 @@
     }
   }
 
-  // Load Bracket list for Admin
+  // Load Bracket list for Admin (Supabase / MySQL)
   async function loadBracketAdmin() {
     try {
+      const sb = getSupabase();
+      if (sb) {
+        const { data, error } = await sb
+          .from('tournament_matches')
+          .select('*')
+          .order('round_order', { ascending: true })
+          .order('match_number', { ascending: true });
+
+        if (error) throw error;
+        bracketMatches = data || [];
+        approvedTeamsList = registrations.filter(r => r.status === 'approved');
+
+        const badge = $('#bracketTotalBadge');
+        if (badge) badge.textContent = bracketMatches.length;
+
+        populateTeamDropdowns();
+        renderBracketTable();
+        return;
+      }
+
       const res = await fetch('api/admin.php?action=bracket_list');
       const json = await res.json();
 
@@ -958,6 +1095,41 @@
     };
 
     try {
+      const sb = getSupabase();
+      if (sb) {
+        if (payload.id) {
+          const { error } = await sb
+            .from('tournament_matches')
+            .update({
+              round_name: payload.round_name,
+              round_order: payload.round_order,
+              match_number: payload.match_number,
+              team1_id: payload.team1_id,
+              team1_name: payload.team1_name,
+              team1_score: payload.team1_score,
+              team2_id: payload.team2_id,
+              team2_name: payload.team2_name,
+              team2_score: payload.team2_score,
+              match_date: payload.match_date,
+              court_name: payload.court_name,
+              status: payload.status,
+              winner_team: payload.winner_team,
+              notes: payload.notes,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', payload.id);
+          if (error) throw error;
+        } else {
+          delete payload.id;
+          const { error } = await sb.from('tournament_matches').insert([payload]);
+          if (error) throw error;
+        }
+        showToast('Laga bracket berhasil disimpan!');
+        closeModal();
+        loadBracketAdmin();
+        return;
+      }
+
       const res = await fetch('api/admin.php?action=bracket_save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -983,6 +1155,15 @@
     }
 
     try {
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from('tournament_matches').delete().eq('id', id);
+        if (error) throw error;
+        showToast('Pertandingan berhasil dihapus');
+        loadBracketAdmin();
+        return;
+      }
+
       const res = await fetch('api/admin.php?action=bracket_delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
