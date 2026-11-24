@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#040d13">
+  <meta name="description" content="Bagan Pertandingan & Knockout Stage Dadakan Volleyball Championship.">
+  <title>Knockout Stage Bracket — Dadakan Volleyball Championship</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="bracket-esports.css">
+</head>
+<body class="bracket-theme-esports">
+
+  <!-- Header Topbar Navigation -->
+  <header class="esports-header">
+    <nav class="topbar">
+      <a class="brand" href="index.html" style="color:#fff;">🏐 DADAKAN VOLLEYBALL</a>
+      <a class="nav-link" href="index.html#form-daftar">Daftar Tim</a>
+      <a class="nav-link" href="bracket.html" style="color:var(--esport-accent-gold);font-weight:800;">Bagan Knockout</a>
+      <a class="nav-link" href="index.html#cek-status">Cek Status Tim</a>
+      <a class="nav-admin" href="admin.html" style="border-color:rgba(0,229,255,0.4);color:#fff;">Portal Admin ↗</a>
+    </nav>
+
+    <!-- M4 Championship Style Title Banner -->
+    <div class="esports-title-area">
+      <div>
+        <div class="tournament-brand-tag">Dadakan Championship — 2026</div>
+        <div class="esports-hero-title">
+          <span class="glow-yellow">KNOCKOUT</span>
+          <span class="glow-cyan">STAGE <em>Bracket</em></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <button class="btn btn-outline" id="refreshBracketPageBtn" style="background:rgba(11,29,40,0.8);color:#dce8ff;border-color:var(--esport-border);font-size:12px;padding:9px 16px;">
+          🔄 Segarkan Live Skor
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Bracket Container Main View -->
+  <main class="bracket-stage-container">
+    <div class="bracket-viewport">
+      <div id="bracketTreeContainer">
+        <!-- Rendered by bracket.js -->
+        <div style="text-align:center;padding:70px 20px;color:var(--esport-text-muted);">
+          <div style="font-size:40px;margin-bottom:14px;color:var(--esport-accent-cyan);">🏐</div>
+          <p style="font-size:14px;letter-spacing:0.05em;">Memuat bagan pertandingan knockout stage…</p>
+        </div>
+      </div>
+
+      <div class="stage-foot-tag">
+        UPPER BRACKET & FINAL ROUNDS
+      </div>
+    </div>
+  </main>
+
+  <footer style="background:#03080d;border-top:1px solid #0f2534;color:#648296;">
+    <b style="color:#cbdbe6;">🏐 DADAKAN VOLLEYBALL</b>
+    <span>CHAMPIONSHIP • KNOCKOUT TOURNAMENT</span>
+    <a href="admin.html" style="color:var(--esport-accent-cyan);text-decoration:none;font-weight:700;font-size:11px;">Admin Dashboard ↗</a>
+  </footer>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="bracket.js"></script>
+</body>
+</html>

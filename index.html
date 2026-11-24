@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071b43"><meta name="description" content="Pendaftaran tim dan pemain Dadakan Volleyball Tournament.">
+  <title>Dadakan Volleyball — Pendaftaran Turnamen</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <nav class="topbar"><a class="brand" href="#top">🏐 DADAKAN VOLLEYBALL</a><a class="nav-link" href="#form-daftar">Daftar Tim</a><a class="nav-link" href="bracket.html">Bagan Turnamen</a><a class="nav-link" href="#cek-status">Cek Status</a><a class="nav-admin" href="admin.html">Login Admin ↗</a></nav>
+    <div class="hero-banner" id="top"><img src="assets/tournament-banner.png" alt="Dadakan Volleyball Tournament"></div>
+    <div class="hero-caption"><span class="eyebrow">OFFICIAL TEAM REGISTRATION</span><h1>SIAPKAN TIMMU. <em>REBUT JUARA.</em></h1><p>Daftarkan tim dan seluruh pemain dalam satu formulir. Tanpa perlu membuat akun.</p><a class="btn btn-yellow" href="#form-daftar">DAFTARKAN TIM <span>↗</span></a></div>
+  </header>
+  <main class="wrap">
+    <section class="stats"><div><b>6–12</b><span>PEMAIN / TIM</span></div><div><b>1 FORM</b><span>UNTUK SATU TIM</span></div><div><b>MANUAL</b><span>VERIFIKASI ADMIN</span></div></section>
+    <section class="content-grid">
+      <section class="panel registration-panel" id="form-daftar">
+        <div class="section-title"><div><span class="eyebrow">TEAM ENTRY</span><h2>Formulir Pendaftaran</h2><p>Isi data kapten, tim, pemain, dan pembayaran.</p></div><span class="step-chip">01 / 03</span></div>
+        <form id="registrationForm">
+          <h3><span>01</span> Identitas tim & kapten</h3>
+          <div class="field-grid"><label>Nama tim *<input name="team_name" required maxlength="70" placeholder="Contoh: GARUDA VOLLEYBALL"></label><label>Asal klub / daerah<input name="origin" maxlength="100" placeholder="Kota atau nama klub"></label><label>Nama kapten *<input name="captain_name" required maxlength="70" placeholder="Nama lengkap kapten"></label><label>Nomor WhatsApp kapten *<input name="whatsapp" required inputmode="tel" pattern="[0-9+() .-]{9,20}" placeholder="08xxxxxxxxxx"></label><label>Email (opsional)<input name="email" type="email" maxlength="120" placeholder="nama@email.com"></label><label>Nama manajer (opsional)<input name="manager_name" maxlength="70" placeholder="Nama manajer"></label></div>
+          <div class="divider"></div>
+          <div class="players-heading"><div><h3><span>02</span> Daftar pemain</h3><p>Minimal 6 dan maksimal 12 pemain. Nomor punggung tidak boleh sama.</p></div><strong id="playerCount">6 / 12</strong></div>
+          <div id="playersList" class="players-list"></div><button class="btn btn-outline" type="button" id="addPlayer">＋ Tambah pemain</button>
+          <div class="divider"></div>
+          <h3><span>03</span> Pembayaran & persetujuan</h3>
+          <div class="payment-note"><b>Instruksi pembayaran</b><p id="paymentInstructions">Informasi rekening bank dan QRIS akan ditampilkan oleh panitia setelah dikonfigurasi.</p></div>
+          <div class="field-grid"><label>Metode pembayaran *<select name="payment_method" required><option value="">Pilih metode</option><option value="Transfer bank">Transfer bank</option><option value="QRIS">QRIS</option></select></label><label>Nama pengirim pembayaran<input name="payer_name" required maxlength="70" placeholder="Nama pada bukti transfer"></label></div>
+          <label class="upload-box"> <span class="upload-icon">↑</span><span><b>Upload bukti pembayaran *</b><small>JPG, PNG atau PDF · maksimal 5 MB</small><span id="proofName" class="file-name">Belum ada file dipilih</span></span><input type="file" id="paymentProof" name="payment_proof" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>
+          <label class="checkline"><input type="checkbox" name="agreement" required><span>Saya memastikan seluruh data pemain benar dan menyetujui peraturan turnamen.</span></label>
+          <button class="btn btn-primary submit-btn" id="submitRegistration" type="submit">KIRIM PENDAFTARAN <span>→</span></button>
+          <p class="form-footnote">Data akan dikirim ke panitia untuk diperiksa. Pendaftaran belum dianggap diterima sebelum diverifikasi admin.</p>
+        </form>
+        <div id="successBox" class="success-box hidden" aria-live="polite"></div>
+      </section>
+      <aside class="side-column">
+        <section class="panel info-panel"><span class="eyebrow">REGISTRATION GUIDE</span><h2>3 langkah mudah</h2><ol class="guide"><li><b>Isi formulir</b><span>Lengkapi identitas tim dan 6–12 pemain.</span></li><li><b>Lakukan pembayaran</b><span>Transfer bank atau QRIS sesuai instruksi panitia.</span></li><li><b>Tunggu verifikasi</b><span>Admin memeriksa data dan bukti pembayaran.</span></li></ol></section>
+        <section class="panel status-panel" id="cek-status"><span class="eyebrow">REGISTRATION TRACKER</span><h2>Cek status tim</h2><p>Masukkan kode registrasi dan 4 digit terakhir WhatsApp kapten.</p><form id="statusForm"><label>Kode registrasi<input name="code" required placeholder="DV-XXXXXX"></label><label>4 digit terakhir WhatsApp<input name="phone_last4" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="1234"></label><button class="btn btn-dark" type="submit">CEK STATUS</button></form><div id="statusResult" class="status-result hidden"></div></section>
+      </aside>
+    </section>
+    <section class="admin-panel panel hidden" id="adminPanel"><div class="admin-header"><div><span class="eyebrow">CONTROL CENTER</span><h2>Dashboard Admin</h2></div><button class="btn btn-outline" id="closeAdmin">Tutup ✕</button></div><div id="adminLoginBox"><p>Login menggunakan akun admin MySQL (XAMPP).</p><form id="adminLoginForm"><div class="field-grid"><label>Email admin<input id="adminEmail" type="email" autocomplete="username" placeholder="admin@dadakan.com" required></label><label>Password<input id="adminPassword" type="password" autocomplete="current-password" placeholder="admin123" required></label></div><div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary" type="submit" id="adminLogin">LOGIN ADMIN</button><a href="admin.html" class="btn btn-yellow" style="text-decoration:none;">Buka Halaman Portal Admin ↗</a></div></form><p id="authMessage" class="form-footnote">Akun bawaan MySQL: <b>admin@dadakan.com</b> / password: <b>admin123</b></p></div><div id="adminDashboard" class="hidden"><div class="admin-toolbar"><div class="admin-stats" id="adminStats"></div><div style="display:flex;gap:10px;"><a href="admin.html" class="btn btn-outline" style="text-decoration:none;">Buka di Portal Penuh ↗</a><button class="btn btn-outline" id="adminLogout">Logout</button></div></div><div class="table-wrap"><table><thead><tr><th>Kode / Tim</th><th>Kapten</th><th>Pemain</th><th>Pembayaran</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="registrationRows"></tbody></table></div></div></section>
+  </main>
+  <footer><b>🏐 DADAKAN VOLLEYBALL</b><span>PLAY • COMPETE • BE THE CHAMPION</span><a href="admin.html" style="color:#dce8ff;text-decoration:none;font-weight:600;font-size:11px;">Portal Admin ↗</a></footer>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+</body></html>

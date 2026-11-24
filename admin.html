@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071b43">
+  <meta name="description" content="Portal Dashboard Admin Turnamen Dadakan Volleyball.">
+  <title>Portal Admin — Dadakan Volleyball Tournament</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+
+<body class="admin-body">
+
+  <!-- Top Navigation Bar -->
+  <header class="admin-nav">
+    <a href="admin.html" class="admin-nav-brand">
+      <b>🏐 DADAKAN VOLLEYBALL</b>
+      <span class="portal-tag">ADMIN PORTAL</span>
+    </a>
+    <div class="admin-nav-actions">
+      <div class="status-badge" title="Status koneksi database">
+        <span class="status-dot" id="connectionDot"></span>
+        <span id="connectionText">Memeriksa…</span>
+      </div>
+      <div id="navActionsLoggedIn" class="hidden" style="display:flex;align-items:center;gap:12px;">
+        <span class="user-pill-email" id="adminUserEmail" style="color:#dce8ff;font-size:12px;"></span>
+        <button class="btn btn-outline" id="refreshBtn" title="Segarkan Data"
+          style="padding:6px 12px;font-size:12px;">🔄 Segarkan</button>
+        <button class="btn btn-outline" id="adminLogoutBtn"
+          style="padding:6px 14px;font-size:12px;background:#ffeded;color:#b42e2e;border-color:#ffc9c9;">Keluar</button>
+      </div>
+      <a href="bracket.html" class="nav-back-link" target="_blank" style="margin-right:10px;">
+        <span>🏆 Lihat Bagan Guest ↗</span>
+      </a>
+      <a href="index.html" class="nav-back-link">
+        <span>← Website Turnamen</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Demo Mode Banner (tampil hanya saat dalam mode demo) -->
+  <div id="demoBanner" class="demo-banner hidden">
+    <div>
+      <b>⚠️ MODE DEMO AKTIF</b> — Menampilkan simulasi data karena MySQL belum terhubung. Jalankan MySQL di XAMPP Control Panel untuk mode database riil.
+    </div>
+    <span style="font-size:11px;opacity:0.85;">Host: <code>localhost</code> · DB: <code>dadakan_volleyball</code></span>
+  </div>
+
+  <!-- SECTION 1: LOGIN CARD -->
+  <main id="loginSection" class="login-wrap">
+    <div class="login-card">
+      <div class="login-card-header">
+        <div class="icon-circle">🔐</div>
+        <h1>LOGIN ADMIN</h1>
+        <p>Masuk ke sistem kontrol verifikasi tim dan bukti pembayaran turnamen.</p>
+      </div>
+      <div class="login-card-body">
+        <div id="loginAlert" class="login-alert hidden"></div>
+
+        <form id="adminLoginForm">
+          <div class="form-group">
+            <label for="adminEmail">Email Admin</label>
+            <div class="input-with-icon">
+              <span class="input-icon">✉️</span>
+              <input id="adminEmail" type="email" placeholder="admin@dadakan.com" required autocomplete="username">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="adminPassword">Password</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🔒</span>
+              <input id="adminPassword" type="password" placeholder="••••••••" required autocomplete="current-password">
+              <button type="button" class="password-toggle" id="togglePassword" aria-label="Lihat Password">
+                <span class="icon">👁️</span>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="login-btn" id="submitLoginBtn">
+            <span>MASUK SEBAGAI ADMIN</span>
+            <span>→</span>
+          </button>
+        </form>
+
+        <div class="login-separator">
+          <span>ATAU</span>
+        </div>
+
+        <button type="button" class="demo-btn" id="demoLoginBtn">
+          <span>🧪 Masuk Mode Demo (Uji Coba Langsung)</span>
+        </button>
+
+        <div class="login-help-toggle">
+          <button type="button" id="helpToggleBtn">Bantuan: Info Akun & Database MySQL XAMPP ▾</button>
+          <div id="helpBox" class="login-help-box hidden">
+            <b>Panduan Database MySQL (XAMPP):</b>
+            <ol>
+              <li>Buka <b>XAMPP Control Panel</b> lalu klik tombol <b>Start</b> pada <b>Apache</b> dan <b>MySQL</b>.</li>
+              <li>Akun admin default otomatis dibuatkan:
+                <br>Email: <code>admin@dadakan.com</code> | Password: <code>admin123</code>
+              </li>
+              <li>Database akan otomatis dibuat (nama: <code>dadakan_volleyball</code>) saat aplikasi pertama kali dijalankan.</li>
+              <li>Anda juga dapat mengimpor file <code>database.sql</code> langsung melalui <b>phpMyAdmin</b> (<code>http://localhost/phpmyadmin</code>).</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SECTION 2: DASHBOARD VIEW (DITAMPILKAN SETELAH LOGIN) -->
+  <main id="dashboardSection" class="admin-main hidden">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+      <div class="dashboard-title">
+        <span class="eyebrow">TOURNAMENT MANAGEMENT</span>
+        <h2>Superadmin Control Panel</h2>
+        <p>Kelola pendaftaran tim, verifikasi pembayaran, susun atlet, dan atur bagan pertandingan turnamen.</p>
+      </div>
+      <div class="actions-group">
+        <button class="btn btn-primary" id="openBracketModalBtn" style="font-size:12px;background:#15803d;border:0;">
+          ＋ Tambah Laga Bracket
+        </button>
+        <button class="btn btn-outline" id="exportCsvBtn" style="font-size:12px;">
+          📥 Unduh Laporan CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Admin Navigation Tabs -->
+    <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:2px solid var(--line);padding-bottom:12px;">
+      <button type="button" class="btn" id="tabTeamsBtn" style="padding:10px 18px;font-size:13px;background:var(--navy);color:#fff;border-radius:10px;">
+        📋 Manajemen Pendaftaran Tim
+      </button>
+      <button type="button" class="btn btn-outline" id="tabBracketBtn" style="padding:10px 18px;font-size:13px;border-radius:10px;">
+        🏆 Bagan & Bracket Pertandingan (<span id="bracketTotalBadge">0</span>)
+      </button>
+    </div>
+
+    <!-- TAB 1: TEAMS & REGISTRATION -->
+    <div id="tabTeamsContent">
+
+    <!-- KPI Metric Cards -->
+    <section class="kpi-grid">
+      <div class="kpi-card total">
+        <div class="kpi-header">
+          <span class="kpi-label">Total Pendaftar</span>
+          <span class="kpi-icon">📋</span>
+        </div>
+        <div class="kpi-value" id="kpiTotal">0</div>
+        <div class="kpi-sub">Seluruh formulir masuk</div>
+      </div>
+
+      <div class="kpi-card pending">
+        <div class="kpi-header">
+          <span class="kpi-label">Menunggu Verifikasi</span>
+          <span class="kpi-icon">⏳</span>
+        </div>
+        <div class="kpi-value" id="kpiPending" style="color:#d97706;">0</div>
+        <div class="kpi-sub">Perlu pemeriksaan panitia</div>
+      </div>
+
+      <div class="kpi-card approved">
+        <div class="kpi-header">
+          <span class="kpi-label">Tim Diterima</span>
+          <span class="kpi-icon">✅</span>
+        </div>
+        <div class="kpi-value" id="kpiApproved" style="color:#10b981;">0</div>
+        <div class="kpi-sub">Lolos verifikasi & bayar</div>
+      </div>
+
+      <div class="kpi-card rejected">
+        <div class="kpi-header">
+          <span class="kpi-label">Ditolak / Revisi</span>
+          <span class="kpi-icon">❌</span>
+        </div>
+        <div class="kpi-value" id="kpiRejected" style="color:#ef4444;">0</div>
+        <div class="kpi-sub">Membutuhkan perbaikan</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Total Atlet</span>
+          <span class="kpi-icon">🏐</span>
+        </div>
+        <div class="kpi-value" id="kpiPlayers" style="color:#1e40af;">0</div>
+        <div class="kpi-sub">Pemain terdaftar di roster</div>
+      </div>
+    </section>
+
+    <!-- Main Table Container -->
+    <div class="admin-card">
+      <!-- Toolbar Filter & Search -->
+      <div class="toolbar">
+        <div class="filter-group">
+          <button type="button" class="filter-btn active" data-filter="all">
+            Semua Tim <span class="filter-badge" id="badgeAll">0</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="pending">
+            Menunggu <span class="filter-badge" id="badgePending">0</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="approved">
+            Diterima <span class="filter-badge" id="badgeApproved">0</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="rejected">
+            Ditolak <span class="filter-badge" id="badgeRejected">0</span>
+          </button>
+        </div>
+
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Cari tim, kode, kapten, kota…">
+        </div>
+      </div>
+
+      <!-- Registrations Data Table -->
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Kode / Tanggal</th>
+              <th>Nama Tim & Asal</th>
+              <th>Kapten & WhatsApp</th>
+              <th>Roster Pemain</th>
+              <th>Pembayaran</th>
+              <th>Status</th>
+              <th>Tindakan Admin</th>
+            </tr>
+          </thead>
+          <tbody id="registrationsTableBody">
+            <!-- Dynamic rows inserted by admin.js -->
+          </tbody>
+        </table>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state hidden">
+          <div class="icon">🏐</div>
+          <h3>Tidak ada pendaftaran ditemukan</h3>
+          <p>Belum ada data tim yang cocok dengan filter atau kata kunci pencarian Anda.</p>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#tabTeamsContent -->
+
+  <!-- TAB 2: BRACKET CRUD MANAGEMENT -->
+  <div id="tabBracketContent" class="hidden">
+    <div class="admin-card">
+      <div class="toolbar">
+        <div style="font-weight:800;font-size:14px;color:var(--navy);">
+          🏆 Daftar Laga Bagan Turnamen (Bracket)
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" id="openBracketModalBtn2" style="font-size:12px;background:#15803d;border:0;">
+            ＋ Buat Pertandingan Baru
+          </button>
+          <button class="btn btn-outline" id="refreshBracketAdminBtn" style="font-size:12px;">
+            🔄 Refresh Bracket
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Babak / Ronde</th>
+              <th>Tim 1 vs Tim 2</th>
+              <th>Skor Pertandingan</th>
+              <th>Jadwal & Lapangan</th>
+              <th>Status Pertandingan</th>
+              <th>Pemenang</th>
+              <th>Aksi CRUD</th>
+            </tr>
+          </thead>
+          <tbody id="bracketTableBody">
+            <!-- Dynamic rows by admin.js -->
+          </tbody>
+        </table>
+
+        <div id="emptyBracketState" class="empty-state hidden">
+          <div class="icon">🏆</div>
+          <h3>Belum Ada Pertandingan Bracket</h3>
+          <p>Klik tombol <b>＋ Buat Pertandingan Baru</b> untuk menyusun bagan pertandingan turnamen.</p>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#tabBracketContent -->
+  </main>
+
+  <!-- MODAL 1: LIHAT ROSTER PEMAIN -->
+  <div class="modal-overlay" id="rosterModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="rosterModalTeamName">Nama Tim</h3>
+          <small style="color:#a8bfe6;">Kode: <span id="rosterModalCode"></span> · Asal: <span
+              id="rosterModalOrigin"></span> · Kapten: <span id="rosterModalCaptain"></span></small>
+        </div>
+        <button type="button" class="modal-close" data-close-modal aria-label="Tutup">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin:0 0 10px;font-size:12px;color:#64748b;">
+          Daftar susunan nomor punggung dan nama lengkap pemain resmi yang didaftarkan:
+        </p>
+        <table class="roster-modal-table">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Nama Pemain</th>
+              <th style="text-align:center;">No. Punggung</th>
+            </tr>
+          </thead>
+          <tbody id="rosterModalBody">
+            <!-- Player rows inserted dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" data-close-modal>Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: LIHAT BUKTI PEMBAYARAN -->
+  <div class="modal-overlay" id="proofModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="proofModalTeam">Bukti Pembayaran</h3>
+          <small id="proofModalPayer" style="color:#a8bfe6;"></small>
+        </div>
+        <button type="button" class="modal-close" data-close-modal aria-label="Tutup">✕</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div id="proofModalPreview" class="proof-preview-wrap">
+          <!-- Image or PDF link inserted dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" data-close-modal>Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: PENOLAKAN / CATATAN ADMIN -->
+  <div class="modal-overlay" id="actionModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header" style="background:#821414;">
+        <h3>Alasan Penolakan / Revisi</h3>
+        <button type="button" class="modal-close" data-close-modal aria-label="Tutup">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin:0 0 12px;font-size:12.5px;color:#475569;">
+          Tuliskan alasan penolakan atau instruksi perbaikan untuk kapten tim (catatan ini dapat dibaca oleh tim saat
+          cek status):
+        </p>
+        <textarea id="actionModalNote" rows="4"
+          style="width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:12px;font-family:inherit;font-size:13px;resize:vertical;"
+          placeholder="Contoh: Bukti transfer terpotong atau nominal tidak sesuai. Harap kirim ulang bukti ke WhatsApp panitia."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" data-close-modal>Batal</button>
+        <button type="button" class="btn" id="actionModalConfirmBtn" style="background:#ef4444;color:#fff;">Simpan &
+          Tolak</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: CRUD BRACKET MATCH (TAMBAH / EDIT PERTANDINGAN) -->
+  <div class="modal-overlay" id="bracketModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 id="bracketModalTitle">Kelola Laga Bagan Pertandingan</h3>
+        <button type="button" class="modal-close" data-close-modal aria-label="Tutup">✕</button>
+      </div>
+      <form id="bracketForm" style="display:flex;flex-direction:column;overflow:hidden;max-height:calc(90vh - 75px);">
+        <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 150px);padding:24px;">
+          <input type="hidden" id="matchId" value="">
+
+          <div class="field-grid" style="margin-bottom:14px;">
+            <label>Babak / Ronde Pertandingan *
+              <select id="matchRoundName" required>
+                <option value="Babak 16 Besar">Babak 16 Besar</option>
+                <option value="Perempat Final">Perempat Final</option>
+                <option value="Semi Final">Semi Final</option>
+                <option value="Perebutan Juara 3">Perebutan Juara 3</option>
+                <option value="Final">Final</option>
+              </select>
+            </label>
+            <label>Urutan Ronde & Match *
+              <div style="display:flex;gap:6px;">
+                <input type="number" id="matchRoundOrder" min="1" max="10" value="1" title="Urutan Ronde (1-5)" required placeholder="Ronde">
+                <input type="number" id="matchNumber" min="1" max="50" value="1" title="Nomor Pertandingan" required placeholder="No. Laga">
+              </div>
+            </label>
+          </div>
+
+          <div style="background:#f8fafc;padding:12px;border-radius:10px;border:1px solid var(--line);margin-bottom:14px;">
+            <div style="font-weight:800;font-size:12px;margin-bottom:8px;color:var(--navy);">TIM 1 (Kiri / Home)</div>
+            <div class="field-grid">
+              <label>Pilih Tim Approved (Opsional)
+                <select id="selectTeam1">
+                  <option value="">-- Ketik manual atau pilih tim --</option>
+                </select>
+              </label>
+              <label>Nama Tim 1 *
+                <input type="text" id="matchTeam1Name" required placeholder="Contoh: GARUDA VC">
+              </label>
+            </div>
+            <label style="margin-top:8px;">Skor Tim 1 (Kosongkan jika belum main)
+              <input type="number" id="matchTeam1Score" min="0" max="99" placeholder="Contoh: 3">
+            </label>
+          </div>
+
+          <div style="background:#f8fafc;padding:12px;border-radius:10px;border:1px solid var(--line);margin-bottom:14px;">
+            <div style="font-weight:800;font-size:12px;margin-bottom:8px;color:var(--navy);">TIM 2 (Kanan / Away)</div>
+            <div class="field-grid">
+              <label>Pilih Tim Approved (Opsional)
+                <select id="selectTeam2">
+                  <option value="">-- Ketik manual atau pilih tim --</option>
+                </select>
+              </label>
+              <label>Nama Tim 2 *
+                <input type="text" id="matchTeam2Name" required placeholder="Contoh: RAJAWALI VC">
+              </label>
+            </div>
+            <label style="margin-top:8px;">Skor Tim 2 (Kosongkan jika belum main)
+              <input type="number" id="matchTeam2Score" min="0" max="99" placeholder="Contoh: 1">
+            </label>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:14px;">
+            <label>Tanggal & Jam Pertandingan
+              <input type="datetime-local" id="matchDateTime">
+            </label>
+            <label>Nama Lapangan
+              <input type="text" id="matchCourtName" value="Lapangan Utama" placeholder="Contoh: Lapangan A">
+            </label>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:14px;">
+            <label>Status Laga *
+              <select id="matchStatus" required>
+                <option value="scheduled">Terjadwal (Scheduled)</option>
+                <option value="live">Sedang Berlangsung (LIVE)</option>
+                <option value="completed">Selesai (Completed)</option>
+              </select>
+            </label>
+            <label>Pemenang Pertandingan
+              <select id="matchWinnerTeam">
+                <option value="">Otomatis / Belum ditentukan</option>
+                <option value="team1">Tim 1 Menang</option>
+                <option value="team2">Tim 2 Menang</option>
+                <option value="draw">Seri (Draw)</option>
+              </select>
+            </label>
+          </div>
+
+          <label>Catatan Tambahan (Opsional)
+            <input type="text" id="matchNotes" placeholder="Contoh: Set 1: 25-23, Set 2: 25-20">
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close-modal>Batal</button>
+          <button type="submit" class="btn btn-primary" id="saveBracketBtn">Simpan Pertandingan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- Scripts -->
+  <script src="admin.js"></script>
+</body>
+
+</html>
